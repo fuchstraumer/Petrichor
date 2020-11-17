@@ -1,0 +1,6 @@
+[submodule "submodules/vulpesrender"]
+	path = submodules/vulpesrender
+	url = https://github.com/fuchstraumer/VulpesRender
+[submodule "submodules/json"]
+	path = submodules/json
+	url = https://github.com/nlohmann/json
