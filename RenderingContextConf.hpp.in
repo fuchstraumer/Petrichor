@@ -1,0 +1,8 @@
+// Master toggle for validation enable/disable
+#cmakedefine PETRICHOR_VALIDATION_ENABLED_CONF
+// Enables the naming of objects and further debug info functionality
+#cmakedefine PETRICHOR_DEBUG_INFO_ENABLED_CONF
+// Created objects have the ID of the thread that created them added to their name string
+#cmakedefine PETRICHOR_DEBUG_INFO_THREADING_ENABLED_CONF
+// Created objects are given a timestamp for their creation (HH::MM::SS::MICROSECOND)
+#cmakedefine PETRICHOR_DEBUG_INFO_TIMESTAMPS_ENABLED_CONF
