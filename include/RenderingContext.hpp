@@ -1,19 +1,19 @@
 #pragma once
 #ifndef PETRICHOR_RENDERING_CONTEXT_HPP
 #define PETRICHOR_RENDERING_CONTEXT_HPP
+#include "PetrichorAPI.hpp"
 #include <vulkan/vulkan_core.h>
+
+#ifdef PETRICHOR_VALIDATION_ENABLED_CONF
+constexpr static bool PETRICHOR_VALIDATION_ENABLED = true;
+#else
+constexpr static bool PETRICHOR_VALIDATION_ENABLED = false;
+#endif
 
 #ifdef PETRICHOR_DEBUG_INFO_ENABLED_CONF
 constexpr static bool PETRICHOR_DEBUG_INFO_ENABLED = false;
 #else
 constexpr static bool PETRICHOR_DEBUG_INFO_ENABLED = true;
-#endif
-
-//#define VTF_VALIDATION_ENABLED_CONF
-#ifdef PETRICHOR_VALIDATION_ENABLED_CONF
-constexpr static bool PETRICHOR_VALIDATION_ENABLED = true;
-#else
-constexpr static bool PETRICHOR_VALIDATION_ENABLED = false;
 #endif
 
 #ifdef PETRICHOR_DEBUG_INFO_THREADING_ENABLED_CONF
@@ -22,9 +22,7 @@ constexpr static bool PETRICHOR_DEBUG_INFO_THREADING_ENABLED = true;
 constexpr static bool PETRICHOR_DEBUG_INFO_THREADING_ENABLED = false;
 #endif
 
-// Really need C++20 for this to work ideally, I feel
-#define VTF_DEBUG_INFO_THREADING_CONF
-#ifdef PETRICHOR_DEBUG_INFO_TIMESTAMPS_CONF
+#ifdef PETRICHOR_DEBUG_INFO_TIMESTAMPS_ENABLED_CONF
 constexpr static bool PETRICHOR_DEBUG_INFO_TIMESTAMPS_ENABLED = true;
 #else
 constexpr static bool PETRICHOR_DEBUG_INFO_TIMESTAMPS_ENABLED = false;
@@ -40,7 +38,8 @@ constexpr static bool PETRICHOR_DEBUG_INFO_TIMESTAMPS_ENABLED = false;
 
 // Forward declarations
 
-namespace vpr {
+namespace vpr
+{
     class Instance;
     class PhysicalDevice;
     class Device;
@@ -59,22 +58,24 @@ namespace petrichor
     struct RenderingContextImpl;
 
     using cursor_pos_callback_t = void(*)(double pos_x, double pos_y);
-    using cursor_enter_callback_t = void(*)(int enter>;
+    using cursor_enter_callback_t = void(*)(int enter);
     using scroll_callback_t = void(*)(double scroll_x, double scroll_y);
     using char_callback_t = void(*)(unsigned int code_point);
     using path_drop_callback_t = void(*)(int count, const char** paths);
     using mouse_button_callback_t = void(*)(int button, int action, int mods);
     using keyboard_key_callback_t = void(*)(int key, int scancode, int action, int mods);
+    using swapchain_callback_t = void(*)(VkSwapchainKHR handle, uint32_t width, uint32_t height);
+    using swapchain_destroyed_callback_t = void(*)(VkSwapchainKHR handle);
 
     using post_physical_device_pre_logical_device_function_t = void(*)(VkPhysicalDevice dvc, VkPhysicalDeviceFeatures** features, void** pNext);
     using post_logical_device_function_t = void(*)(void* pNext);
 
     struct SwapchainCallbacks
     {
-        void(*)(VkSwapchainKHR handle, uint32_t width, uint32_t height) SwapchainCreated;
-        void(*)(VkSwapchainKHR handle, uint32_t width, uint32_t height) BeginResize;
-        void(*)(VkSwapchainKHR handle, uint32_t width, uint32_t height) CompleteResize;
-        void(*)(VkSwapchainKHR handle) SwapchainDestroyed;
+        swapchain_callback_t SwapchainCreated;
+        swapchain_callback_t BeginResize;
+        swapchain_callback_t CompleteResize;
+        swapchain_destroyed_callback_t SwapchainDestroyed;
     };
 
     struct DescriptorLimits
@@ -90,7 +91,7 @@ namespace petrichor
         uint32_t MaxInputAttachments;
     };
 
-    class RenderingContext
+    class PETRICHOR_API RenderingContext
     {
         RenderingContext();
         ~RenderingContext();

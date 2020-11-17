@@ -1,6 +1,7 @@
 #pragma once
 #ifndef PETRICHOR_PLATFORM_WINDOW_HPP
 #define PETRICHOR_PLATFORM_WINDOW_HPP
+#include "PetrichorAPI.hpp"
 
 struct GLFWwindow;
 
@@ -17,7 +18,7 @@ namespace petrichor
 
     struct WindowCallbackLists;
 
-    class PlatformWindow
+    class PETRICHOR_API PlatformWindow
     {
         PlatformWindow(const PlatformWindow&) = delete;
         PlatformWindow& operator=(const PlatformWindow&) = delete;
@@ -53,7 +54,7 @@ namespace petrichor
 
     private:
 
-        friend class RenderingContext;
+        friend struct RenderingContextImpl;
         GLFWwindow* glfwWindow() noexcept;
 
         void createWindow(const char* app_name);

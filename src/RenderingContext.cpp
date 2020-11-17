@@ -29,25 +29,25 @@
 namespace
 {
 
-    static post_physical_device_pre_logical_device_function_t postPhysicalPreLogicalSetupFunction = nullptr;
-    static post_logical_device_function_t postLogicalDeviceFunction = nullptr;
+    static petrichor::post_physical_device_pre_logical_device_function_t postPhysicalPreLogicalSetupFunction = nullptr;
+    static petrichor::post_logical_device_function_t postLogicalDeviceFunction = nullptr;
     static void* usedNextPtr = nullptr;
     static VkPhysicalDeviceFeatures* enabledDeviceFeatures = nullptr;
     static std::vector<std::string> extensionsBuffer;
     static std::string windowingModeBuffer;
     static bool validationEnabled{ false };
     struct swapchain_callbacks_storage_t {
-        std::forward_list<decltype(SwapchainCallbacks::SwapchainCreated)> CreationFns;
-        std::forward_list<decltype(SwapchainCallbacks::BeginResize)> BeginFns;
-        std::forward_list<decltype(SwapchainCallbacks::CompleteResize)> CompleteFns;
-        std::forward_list<decltype(SwapchainCallbacks::SwapchainDestroyed)> DestroyedFns;
+        std::forward_list<decltype(petrichor::SwapchainCallbacks::SwapchainCreated)> CreationFns;
+        std::forward_list<decltype(petrichor::SwapchainCallbacks::BeginResize)> BeginFns;
+        std::forward_list<decltype(petrichor::SwapchainCallbacks::CompleteResize)> CompleteFns;
+        std::forward_list<decltype(petrichor::SwapchainCallbacks::SwapchainDestroyed)> DestroyedFns;
     };
     static swapchain_callbacks_storage_t SwapchainCallbacksStorage;
-    static const std::unordered_map<std::string, windowing_mode> windowing_mode_str_to_flag
+    static const std::unordered_map<std::string, petrichor::windowing_mode> windowing_mode_str_to_flag
     {
-        { "Windowed", windowing_mode::Windowed },
-        { "BorderlessWindowed", windowing_mode::BorderlessWindowed },
-        { "Fullscreen", windowing_mode::Fullscreen }
+        { "Windowed", petrichor::windowing_mode::Windowed },
+        { "BorderlessWindowed", petrichor::windowing_mode::BorderlessWindowed },
+        { "Fullscreen", petrichor::windowing_mode::Fullscreen }
     };
 
     inline void RecreateSwapchain();
@@ -59,7 +59,7 @@ namespace
         void* user_data);
     static void SplitVersionString(std::string version_string, uint32_t& major_version, uint32_t& minor_version, uint32_t& patch_version);
     static void GetVersions(const nlohmann::json& json_file, uint32_t& app_version, uint32_t& engine_version, uint32_t& api_version);
-    void createInstanceAndWindow(const nlohmann::json& json_file, std::unique_ptr<vpr::Instance>* instance, std::unique_ptr<PlatformWindow>* window, std::string& _window_mode);
+    void createInstanceAndWindow(const nlohmann::json& json_file, std::unique_ptr<vpr::Instance>* instance, std::unique_ptr<petrichor::PlatformWindow>* window, std::string& _window_mode);
     void createLogicalDevice(const nlohmann::json& json_file, VkSurfaceKHR surface, std::unique_ptr<vpr::Device>* device, vpr::Instance* instance, vpr::PhysicalDevice* physical_device);
     std::atomic<bool>& GetShouldResizeFlag();
 
@@ -70,6 +70,10 @@ namespace petrichor
 
     struct RenderingContextImpl
     {
+
+        void construct(const char* cfg_file_path);
+        void update();
+        void destroy();
         
         std::unique_ptr<PlatformWindow> window;
         std::unique_ptr<vpr::Instance> vulkanInstance;
@@ -130,134 +134,12 @@ namespace petrichor
 
     void RenderingContext::Construct(const char* file_path)
     {
-
-        std::ifstream input_file(file_path);
-
-        if (!input_file.is_open())
-        {
-            throw std::runtime_error("Couldn't open input file.");
-        }
-
-        nlohmann::json json_file;
-        input_file >> json_file;
-
-        createInstanceAndWindow(json_file, &vulkanInstance, &window, windowMode);
-        window->SetWindowUserPointer(this);
-        // Physical devices to be redone for multi-GPU support if device group extension is supported.
-        physicalDevices.emplace_back(std::make_unique<vpr::PhysicalDevice>(vulkanInstance->vkHandle()));
-
-        if (postPhysicalPreLogicalSetupFunction != nullptr)
-        {
-            postPhysicalPreLogicalSetupFunction(physicalDevices.back()->vkHandle(), &enabledDeviceFeatures, &usedNextPtr);
-        }
-
-        {
-            size_t num_instance_extensions = 0;
-            vulkanInstance->GetEnabledExtensions(&num_instance_extensions, nullptr);
-            if (num_instance_extensions != 0)
-            {
-                std::vector<char*> extensions_buffer(num_instance_extensions);
-                vulkanInstance->GetEnabledExtensions(&num_instance_extensions, extensions_buffer.data());
-                for (auto& str : extensions_buffer)
-                {
-                    instanceExtensions.emplace_back(str);
-                    free(str);
-                }
-            }
-        }
-
-        windowSurface = std::make_unique<vpr::SurfaceKHR>(vulkanInstance.get(), physicalDevices[0]->vkHandle(), (void*)window->glfwWindow());
-
-        createLogicalDevice(json_file, windowSurface->vkHandle(), &logicalDevice, vulkanInstance.get(), physicalDevices[0].get());
-
-        if constexpr (VTF_VALIDATION_ENABLED)
-        {
-            SetObjectNameFn = logicalDevice->DebugUtilsHandler().vkSetDebugUtilsObjectName;
-
-            const VkDebugUtilsMessengerCreateInfoEXT messenger_info
-            {
-                VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-                nullptr,
-                0,
-                // capture warnings and info that the current one does not
-                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-                VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-                (PFN_vkDebugUtilsMessengerCallbackEXT)DebugUtilsMessengerCallback,
-                nullptr
-            };
-
-            const auto& debugUtilsFnPtrs = logicalDevice->DebugUtilsHandler();
-
-            if (!debugUtilsFnPtrs.vkCreateDebugUtilsMessenger)
-            {
-                LOG(ERROR) << "Debug utils function pointers struct doesn't have function pointer for debug utils messenger creation!";
-                throw std::runtime_error("Failed to create debug utils messenger: function pointer not loaded!");
-            }
-
-            VkResult result = debugUtilsFnPtrs.vkCreateDebugUtilsMessenger(vulkanInstance->vkHandle(), &messenger_info, nullptr, &DebugUtilsMessenger);
-            if (result != VK_SUCCESS)
-            {
-                throw std::runtime_error("Failed to create debug utils messenger.");
-            }
-            // color terminal output so it's less of a cluster
-            el::Loggers::addFlag(el::LoggingFlag::ColoredTerminalOutput);
-        }
-
-        {
-            size_t num_device_extensions = 0;
-            logicalDevice->GetEnabledExtensions(&num_device_extensions, nullptr);
-            if (num_device_extensions != 0)
-            {
-                std::vector<char*> extensions_buffer(num_device_extensions);
-                logicalDevice->GetEnabledExtensions(&num_device_extensions, extensions_buffer.data());
-                for (auto& str : extensions_buffer)
-                {
-                    deviceExtensions.emplace_back(str);
-                    free(str);
-                }
-            }
-        }
-
-        static const std::unordered_map<std::string, vpr::vertical_sync_mode> present_mode_from_str_map
-        {
-            { "None", vpr::vertical_sync_mode::None },
-            { "VerticalSync", vpr::vertical_sync_mode::VerticalSync },
-            { "VerticalSyncRelaxed", vpr::vertical_sync_mode::VerticalSyncRelaxed },
-            { "VerticalSyncMailbox", vpr::vertical_sync_mode::VerticalSyncMailbox }
-        };
-
-        auto iter = json_file.find("VerticalSyncMode");
-        // We want to go for this, as it's the ideal mode usually.
-        vpr::vertical_sync_mode desired_mode = vpr::vertical_sync_mode::VerticalSyncMailbox;
-        if (iter != json_file.end())
-        {
-            auto present_mode_iter = present_mode_from_str_map.find(json_file.at("VerticalSyncMode"));
-            if (present_mode_iter != std::cend(present_mode_from_str_map))
-            {
-                desired_mode = present_mode_iter->second;
-            }
-        }
-
-        swapchain = std::make_unique<vpr::Swapchain>(logicalDevice.get(), window->glfwWindow(), windowSurface->vkHandle(), desired_mode);
-
-        if constexpr (VTF_VALIDATION_ENABLED && VTF_USE_DEBUG_INFO)
-        {
-            SetObjectName(VK_OBJECT_TYPE_SWAPCHAIN_KHR, (uint64_t)swapchain->vkHandle(), "RenderingContextSwapchain");
-
-            for (size_t i = 0u; i < swapchain->ImageCount(); ++i)
-            {
-                const std::string view_name = std::string("RenderingContextSwapchain_ImageView") + std::to_string(i);
-                SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)swapchain->ImageView(i), view_name.c_str());
-                const std::string img_name = std::string("RenderingContextSwapchain_Image") + std::to_string(i);
-                SetObjectName(VK_OBJECT_TYPE_IMAGE, (uint64_t)swapchain->Image(i), img_name.c_str());
-            }
-        }
-
+        impl->construct(file_path);
     }
 
     void RenderingContext::Update()
     {
-        window->Update();
+        impl->window->Update();
         if (ShouldResizeExchange(false))
         {
             RecreateSwapchain();
@@ -266,51 +148,42 @@ namespace petrichor
 
     void RenderingContext::Destroy()
     {
-        swapchain.reset();
-        if constexpr (VTF_VALIDATION_ENABLED)
-        {
-            logicalDevice->DebugUtilsHandler().vkDestroyDebugUtilsMessenger(vulkanInstance->vkHandle(), DebugUtilsMessenger, nullptr);
-        }
-        logicalDevice.reset();
-        windowSurface.reset();
-        physicalDevices.clear(); physicalDevices.shrink_to_fit();
-        vulkanInstance.reset();
-        window.reset();
+        impl->destroy();
     }
 
     vpr::Instance * RenderingContext::Instance() noexcept
     {
-        return vulkanInstance.get();
+        return impl->vulkanInstance.get();
     }
 
     vpr::PhysicalDevice * RenderingContext::PhysicalDevice(const size_t idx) noexcept
     {
-        return physicalDevices[idx].get();
+        return impl->physicalDevices[idx].get();
     }
 
     vpr::Device* RenderingContext::Device() noexcept
     {
-        return logicalDevice.get();
+        return impl->logicalDevice.get();
     }
 
     vpr::Swapchain* RenderingContext::Swapchain() noexcept
     {
-        return swapchain.get();
+        return impl->swapchain.get();
     }
 
     vpr::SurfaceKHR* RenderingContext::Surface() noexcept
     {
-        return windowSurface.get();
+        return impl->windowSurface.get();
     }
 
     PlatformWindow* RenderingContext::Window() noexcept
     {
-        return window.get();
+        return impl->window.get();
     }
 
     GLFWwindow* RenderingContext::glfwWindow() noexcept
     {
-        return window->glfwWindow();
+        return impl->window->glfwWindow();
     }
 
     inline GLFWwindow* getWindow()
@@ -512,24 +385,24 @@ namespace petrichor
     void RenderingContext::SetShaderCacheDir(const char* dir)
     {
         auto& ctxt = Get();
-        ctxt.shaderCacheDir = dir;
+        ctxt->impl.shaderCacheDir = dir;
     }
 
     VkResult RenderingContext::SetObjectName(VkObjectType object_type, uint64_t handle, const char* name)
     {
-        if constexpr (VTF_VALIDATION_ENABLED && VTF_USE_DEBUG_INFO)
+        if constexpr (PETRICHOR_VALIDATION_ENABLED && PETRICHOR_DEBUG_INFO_ENABLED)
         {
             auto& ctxt = Get();
 
-            if constexpr (VTF_DEBUG_INFO_THREADING || VTF_DEBUG_INFO_TIMESTAMPS)
+            if constexpr (PETRICHOR_DEBUG_INFO_THREADING_ENABLED || PETRICHOR_DEBUG_INFO_TIMESTAMPS_ENABLED)
             {
                 std::string object_name_str{ name };
                 std::stringstream extra_info_stream;
-                if constexpr (VTF_DEBUG_INFO_THREADING)
+                if constexpr (PETRICHOR_DEBUG_INFO_THREADING_ENABLED)
                 {
                     extra_info_stream << std::string("_ThreadID:") << std::this_thread::get_id();
                 }
-                if constexpr (VTF_DEBUG_INFO_TIMESTAMPS)
+                if constexpr (PETRICHOR_DEBUG_INFO_TIMESTAMPS_ENABLED)
                 {
 
                 }
@@ -562,6 +435,145 @@ namespace petrichor
         {
             return VK_SUCCESS;
         }
+    }
+
+    void RenderingContextImpl::construct(const char* cfg_file_path)
+    {
+        std::ifstream input_file(cfg_file_path);
+
+        if (!input_file.is_open())
+        {
+            throw std::runtime_error("Couldn't open input file.");
+        }
+
+        nlohmann::json json_file;
+        input_file >> json_file;
+
+        createInstanceAndWindow(json_file, &vulkanInstance, &window, windowMode);
+        window->SetWindowUserPointer(this);
+        // Physical devices to be redone for multi-GPU support if device group extension is supported.
+        physicalDevices.emplace_back(std::make_unique<vpr::PhysicalDevice>(vulkanInstance->vkHandle()));
+
+        if (postPhysicalPreLogicalSetupFunction != nullptr)
+        {
+            postPhysicalPreLogicalSetupFunction(physicalDevices.back()->vkHandle(), &enabledDeviceFeatures, &usedNextPtr);
+        }
+
+        {
+            size_t num_instance_extensions = 0;
+            vulkanInstance->GetEnabledExtensions(&num_instance_extensions, nullptr);
+            if (num_instance_extensions != 0)
+            {
+                std::vector<char*> extensions_buffer(num_instance_extensions);
+                vulkanInstance->GetEnabledExtensions(&num_instance_extensions, extensions_buffer.data());
+                for (auto& str : extensions_buffer)
+                {
+                    instanceExtensions.emplace_back(str);
+                    free(str);
+                }
+            }
+        }
+
+        windowSurface = std::make_unique<vpr::SurfaceKHR>(vulkanInstance.get(), physicalDevices[0]->vkHandle(), (void*)window->glfwWindow());
+
+        createLogicalDevice(json_file, windowSurface->vkHandle(), &logicalDevice, vulkanInstance.get(), physicalDevices[0].get());
+
+        if constexpr (PETRICHOR_VALIDATION_ENABLED)
+        {
+            SetObjectNameFn = logicalDevice->DebugUtilsHandler().vkSetDebugUtilsObjectName;
+
+            const VkDebugUtilsMessengerCreateInfoEXT messenger_info
+            {
+                VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+                nullptr,
+                0,
+                // capture warnings and info that the current one does not
+                VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+                VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+                (PFN_vkDebugUtilsMessengerCallbackEXT)DebugUtilsMessengerCallback,
+                nullptr
+            };
+
+            const auto& debugUtilsFnPtrs = logicalDevice->DebugUtilsHandler();
+
+            if (!debugUtilsFnPtrs.vkCreateDebugUtilsMessenger)
+            {
+                LOG(ERROR) << "Debug utils function pointers struct doesn't have function pointer for debug utils messenger creation!";
+                throw std::runtime_error("Failed to create debug utils messenger: function pointer not loaded!");
+            }
+
+            VkResult result = debugUtilsFnPtrs.vkCreateDebugUtilsMessenger(vulkanInstance->vkHandle(), &messenger_info, nullptr, &DebugUtilsMessenger);
+            if (result != VK_SUCCESS)
+            {
+                throw std::runtime_error("Failed to create debug utils messenger.");
+            }
+            // color terminal output so it's less of a cluster
+            el::Loggers::addFlag(el::LoggingFlag::ColoredTerminalOutput);
+        }
+
+        {
+            size_t num_device_extensions = 0;
+            logicalDevice->GetEnabledExtensions(&num_device_extensions, nullptr);
+            if (num_device_extensions != 0)
+            {
+                std::vector<char*> extensions_buffer(num_device_extensions);
+                logicalDevice->GetEnabledExtensions(&num_device_extensions, extensions_buffer.data());
+                for (auto& str : extensions_buffer)
+                {
+                    deviceExtensions.emplace_back(str);
+                    free(str);
+                }
+            }
+        }
+
+        static const std::unordered_map<std::string, vpr::vertical_sync_mode> present_mode_from_str_map
+        {
+            { "None", vpr::vertical_sync_mode::None },
+            { "VerticalSync", vpr::vertical_sync_mode::VerticalSync },
+            { "VerticalSyncRelaxed", vpr::vertical_sync_mode::VerticalSyncRelaxed },
+            { "VerticalSyncMailbox", vpr::vertical_sync_mode::VerticalSyncMailbox }
+        };
+
+        auto iter = json_file.find("VerticalSyncMode");
+        // We want to go for this, as it's the ideal mode usually.
+        vpr::vertical_sync_mode desired_mode = vpr::vertical_sync_mode::VerticalSyncMailbox;
+        if (iter != json_file.end())
+        {
+            auto present_mode_iter = present_mode_from_str_map.find(json_file.at("VerticalSyncMode"));
+            if (present_mode_iter != std::cend(present_mode_from_str_map))
+            {
+                desired_mode = present_mode_iter->second;
+            }
+        }
+
+        swapchain = std::make_unique<vpr::Swapchain>(logicalDevice.get(), window->glfwWindow(), windowSurface->vkHandle(), desired_mode);
+
+        if constexpr (PETRICHOR_VALIDATION_ENABLED && PETRICHOR_DEBUG_INFO_ENABLED)
+        {
+            RenderingContext::SetObjectName(VK_OBJECT_TYPE_SWAPCHAIN_KHR, (uint64_t)swapchain->vkHandle(), "RenderingContextSwapchain");
+
+            for (size_t i = 0u; i < swapchain->ImageCount(); ++i)
+            {
+                const std::string view_name = std::string("RenderingContextSwapchain_ImageView") + std::to_string(i);
+                RenderingContext::SetObjectName(VK_OBJECT_TYPE_IMAGE_VIEW, (uint64_t)swapchain->ImageView(i), view_name.c_str());
+                const std::string img_name = std::string("RenderingContextSwapchain_Image") + std::to_string(i);
+                RenderingContext::SetObjectName(VK_OBJECT_TYPE_IMAGE, (uint64_t)swapchain->Image(i), img_name.c_str());
+            }
+        }
+    }
+
+    void RenderingContextImpl::destroy()
+    {
+        swapchain.reset();
+        if constexpr (PETRICHOR_VALIDATION_ENABLED)
+        {
+            logicalDevice->DebugUtilsHandler().vkDestroyDebugUtilsMessenger(vulkanInstance->vkHandle(), DebugUtilsMessenger, nullptr);
+        }
+        logicalDevice.reset();
+        windowSurface.reset();
+        physicalDevices.clear(); physicalDevices.shrink_to_fit();
+        vulkanInstance.reset();
+        window.reset();
     }
 
 }
