@@ -7,3 +7,6 @@
 [submodule "submodules/vma"]
 	path = submodules/vma
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+[submodule "submodules/glm"]
+	path = submodules/glm
+	url = https://github.com/g-truc/glm
