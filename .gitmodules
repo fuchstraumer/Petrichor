@@ -4,3 +4,6 @@
 [submodule "submodules/json"]
 	path = submodules/json
 	url = https://github.com/nlohmann/json
+[submodule "submodules/vma"]
+	path = submodules/vma
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
