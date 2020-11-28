@@ -1,7 +1,8 @@
 #pragma once
 #ifndef PETRICHOR_RENDERING_CONTEXT_HPP
 #define PETRICHOR_RENDERING_CONTEXT_HPP
-#include "PetrichorAPI.hpp"
+#include "RenderingContextConfig.hpp" // generated file: ends up in build dir
+#include "PetrichorAPI.hpp" // depends on static/dynamic linkage config in above header
 #include <vulkan/vulkan_core.h>
 
 #ifdef PETRICHOR_VALIDATION_ENABLED_CONF
