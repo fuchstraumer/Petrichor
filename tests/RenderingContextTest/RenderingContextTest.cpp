@@ -283,6 +283,7 @@ void VulkanTriangle::Destroy()
     vkDestroyDescriptorSetLayout(vprObjects.device->vkHandle(), setLayout, nullptr);
     vkDestroyDescriptorPool(vprObjects.device->vkHandle(), descriptorPool, nullptr);
     vkFreeCommandBuffers(vprObjects.device->vkHandle(), commandPool, static_cast<uint32_t>(drawCmdBuffers.size()), drawCmdBuffers.data());
+    vkDestroyCommandPool(vprObjects.device->vkHandle(), commandPool, nullptr);
     vkFreeMemory(vprObjects.device->vkHandle(), uniformBufferVS.memory, nullptr);
     vkDestroyBuffer(vprObjects.device->vkHandle(), uniformBufferVS.buffer, nullptr);
     vkFreeMemory(vprObjects.device->vkHandle(), Indices.memory, nullptr);

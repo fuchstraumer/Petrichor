@@ -112,6 +112,7 @@ namespace petrichor
 
     RenderingContext::~RenderingContext()
     {
+        impl->destroy();
         delete impl;
     }
 
@@ -529,7 +530,8 @@ namespace petrichor
         }
         logicalDevice.reset();
         windowSurface.reset();
-        physicalDevices.clear(); physicalDevices.shrink_to_fit();
+        physicalDevices.clear();
+        physicalDevices.shrink_to_fit();
         vulkanInstance.reset();
         window.reset();
     }

@@ -77,6 +77,8 @@ function(add_petrichor_test NAME)
         set_target_properties(${NAME} PROPERTIES CXX_STANDARD 20 CXX_STANDARD_REQUIRED YES)
     endif()
     set_target_properties(${NAME} PROPERTIES FOLDER "Petrichor Tests")
+    ADD_CUSTOM_COMMAND(TARGET ${NAME} POST_BUILD COMMAND ${CMAKE_COMMAND}
+        -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/cfg/" "${CMAKE_CURRENT_BINARY_DIR}/")
 endfunction()
 
 option(PETRICHOR_BUILD_TESTS "Build a series of test executables used to verify core functionality" OFF)
