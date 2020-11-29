@@ -54,6 +54,7 @@ namespace petrichor
 
     private:
 
+        friend class RenderingContext;
         friend struct RenderingContextImpl;
         GLFWwindow* glfwWindow() noexcept;
 

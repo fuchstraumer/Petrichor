@@ -43,7 +43,8 @@ namespace petrichor
     {
         limiterA = std::chrono::system_clock::now();
         std::chrono::duration<double, std::milli> work_time = limiterA - limiterB;
-        if (work_time.count() < 16.0) {
+        if (work_time.count() < 16.0)
+        {
             std::chrono::duration<double, std::milli> delta_ms(16.0 - work_time.count());
                 auto delta_ms_dur = std::chrono::duration_cast<std::chrono::milliseconds>(delta_ms);
                 std::this_thread::sleep_for(std::chrono::milliseconds(delta_ms_dur.count()));
@@ -62,7 +63,8 @@ namespace petrichor
 
         VkResult present_results[1]{ VK_SUCCESS };
 
-        const VkPresentInfoKHR present_info {
+        const VkPresentInfoKHR present_info
+        {
             VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             nullptr,
             1,

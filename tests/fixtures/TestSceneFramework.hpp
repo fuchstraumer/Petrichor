@@ -14,16 +14,16 @@ namespace vpr
     class Semaphore;
 }
 
-struct RequiredVprObjects
-{
-    vpr::Device* device = nullptr;
-    vpr::PhysicalDevice* physicalDevice = nullptr;
-    vpr::Instance* instance = nullptr;
-    vpr::Swapchain* swapchain = nullptr;
-};
-
 namespace petrichor
 {
+
+    struct RequiredVprObjects
+    {
+        vpr::Device* device = nullptr;
+        vpr::PhysicalDevice* physicalDevice = nullptr;
+        vpr::Instance* instance = nullptr;
+        vpr::Swapchain* swapchain = nullptr;
+    };
 
     class VulkanScene
     {

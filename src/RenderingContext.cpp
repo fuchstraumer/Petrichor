@@ -50,7 +50,7 @@ namespace
         { "Fullscreen", petrichor::windowing_mode::Fullscreen }
     };
 
-    inline void RecreateSwapchain();
+    void RecreateSwapchain();
     std::string objectTypeToString(const VkObjectType type);
     VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsMessengerCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
@@ -191,48 +191,6 @@ namespace petrichor
         auto& ctxt = RenderingContext::Get();
         return ctxt.glfwWindow();
     }
-
-#ifdef _MSC_VER
-    #pragma warning(push)
-    #pragma warning(disable: 4302)
-    #pragma warning(disable: 4311)
-#endif //!_MSC_VER
-    inline void RecreateSwapchain()
-    {
-
-        auto& Context = RenderingContext::Get();
-
-        int width = 0;
-        int height = 0;
-        while (width == 0 || height == 0)
-        {
-            glfwGetFramebufferSize(Context.glfwWindow(), &width, &height);
-            glfwWaitEvents();
-        }
-
-        vkDeviceWaitIdle(Context.Device()->vkHandle());
-
-        Context.Window()->GetWindowSize(width, height);
-
-        for (auto& fn : SwapchainCallbacksStorage.BeginFns)
-        {
-            fn(Context.Swapchain()->vkHandle(), width, height);
-        }
-
-        vpr::RecreateSwapchainAndSurface(Context.Swapchain(), Context.Surface());
-        Context.Device()->UpdateSurface(Context.Surface()->vkHandle());
-
-        Context.Window()->GetWindowSize(width, height);
-        for (auto& fn : SwapchainCallbacksStorage.CompleteFns)
-        {
-            fn(Context.Swapchain()->vkHandle(), width, height);
-        }
-
-        vkDeviceWaitIdle(Context.Device()->vkHandle());
-    }
-#ifdef _MSC_VER
-    #pragma warning(pop)
-#endif
 
     void AddSwapchainCallbacks(SwapchainCallbacks callbacks)
     {
@@ -379,13 +337,13 @@ namespace petrichor
     const char* RenderingContext::GetShaderCacheDir()
     {
         auto& ctxt = Get();
-        return ctxt.shaderCacheDir.c_str();
+        return ctxt.impl->shaderCacheDir.c_str();
     }
 
     void RenderingContext::SetShaderCacheDir(const char* dir)
     {
         auto& ctxt = Get();
-        ctxt->impl.shaderCacheDir = dir;
+        ctxt.impl->shaderCacheDir = dir;
     }
 
     VkResult RenderingContext::SetObjectName(VkObjectType object_type, uint64_t handle, const char* name)
@@ -417,7 +375,7 @@ namespace petrichor
                     object_name_str.c_str()
                 };
 
-                return ctxt.SetObjectNameFn(ctxt.logicalDevice->vkHandle(), &name_info);
+                return ctxt.impl->SetObjectNameFn(ctxt.impl->logicalDevice->vkHandle(), &name_info);
             }
             else
             {
@@ -428,7 +386,7 @@ namespace petrichor
                     handle,
                     name
                 };
-                return ctxt.SetObjectNameFn(ctxt.logicalDevice->vkHandle(), &name_info);
+                return ctxt.impl->SetObjectNameFn(ctxt.impl->logicalDevice->vkHandle(), &name_info);
             }
         }
         else
@@ -800,7 +758,7 @@ namespace
         }
     }
 
-    void createInstanceAndWindow(const nlohmann::json& json_file, std::unique_ptr<vpr::Instance>* instance, std::unique_ptr<PlatformWindow>* window, std::string& _window_mode)
+    void createInstanceAndWindow(const nlohmann::json& json_file, std::unique_ptr<vpr::Instance>* instance, std::unique_ptr<petrichor::PlatformWindow>* window, std::string& _window_mode)
     {
 
         int window_width = json_file.at("InitialWindowWidth");
@@ -810,13 +768,13 @@ namespace
         windowingModeBuffer = windowing_mode_str;
         _window_mode = windowingModeBuffer;
         auto iter = windowing_mode_str_to_flag.find(windowing_mode_str);
-        windowing_mode window_mode = windowing_mode::Windowed;
+        petrichor::windowing_mode  window_mode = petrichor::windowing_mode::Windowed;
         if (iter != std::cend(windowing_mode_str_to_flag))
         {
             window_mode = iter->second;
         }
 
-        *window = std::make_unique<PlatformWindow>(window_width, window_height, app_name.c_str(), window_mode);
+        *window = std::make_unique<petrichor::PlatformWindow>(window_width, window_height, app_name.c_str(), window_mode);
 
         const std::string engine_name = json_file.at("EngineName");
         const bool using_validation = json_file.at("EnableValidation");
@@ -936,4 +894,47 @@ namespace
         static std::atomic<bool> should_resize{ false };
         return should_resize;
     }
+
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4302)
+#pragma warning(disable: 4311)
+#endif //!_MSC_VER
+    void RecreateSwapchain()
+    {
+
+        auto& Context = petrichor::RenderingContext::Get();
+
+        int width = 0;
+        int height = 0;
+        while (width == 0 || height == 0)
+        {
+            glfwGetFramebufferSize(Context.glfwWindow(), &width, &height);
+            glfwWaitEvents();
+        }
+
+        vkDeviceWaitIdle(Context.Device()->vkHandle());
+
+        Context.Window()->GetWindowSize(width, height);
+
+        for (auto& fn : SwapchainCallbacksStorage.BeginFns)
+        {
+            fn(Context.Swapchain()->vkHandle(), width, height);
+        }
+
+        vpr::RecreateSwapchainAndSurface(Context.Swapchain(), Context.Surface());
+        Context.Device()->UpdateSurface(Context.Surface()->vkHandle());
+
+        Context.Window()->GetWindowSize(width, height);
+        for (auto& fn : SwapchainCallbacksStorage.CompleteFns)
+        {
+            fn(Context.Swapchain()->vkHandle(), width, height);
+        }
+
+        vkDeviceWaitIdle(Context.Device()->vkHandle());
+    }
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 }
